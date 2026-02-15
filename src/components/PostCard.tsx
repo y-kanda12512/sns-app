@@ -1,7 +1,18 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
-import { deleteDoc, doc } from "firebase/firestore";
+import {
+  deleteDoc,
+  doc,
+  addDoc,
+  collection,
+  query,
+  where,
+  getDocs,
+  updateDoc,
+  increment,
+} from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import type { Post } from "@/types/post";
@@ -23,12 +34,56 @@ function timeAgo(date: Date | null): string {
 export default function PostCard({
   post,
   onDeleted,
+  initialLiked = false,
 }: {
   post: Post;
   onDeleted?: () => void;
+  initialLiked?: boolean;
 }) {
   const { user } = useAuth();
   const isMine = user?.uid === post.authorId;
+  const [liked, setLiked] = useState(initialLiked);
+  const [likesCount, setLikesCount] = useState(post.likesCount);
+  const [liking, setLiking] = useState(false);
+
+  const handleLike = async () => {
+    if (!user || liking) return;
+    setLiking(true);
+
+    try {
+      const likesQuery = query(
+        collection(db, "postLikes"),
+        where("postId", "==", post.id),
+        where("userId", "==", user.uid)
+      );
+      const snapshot = await getDocs(likesQuery);
+
+      if (snapshot.empty) {
+        // いいねする
+        await addDoc(collection(db, "postLikes"), {
+          postId: post.id,
+          userId: user.uid,
+        });
+        await updateDoc(doc(db, "posts", post.id), {
+          likesCount: increment(1),
+        });
+        setLiked(true);
+        setLikesCount((prev) => prev + 1);
+      } else {
+        // いいね解除
+        await deleteDoc(snapshot.docs[0].ref);
+        await updateDoc(doc(db, "posts", post.id), {
+          likesCount: increment(-1),
+        });
+        setLiked(false);
+        setLikesCount((prev) => prev - 1);
+      }
+    } catch (err) {
+      console.error("いいねエラー:", err);
+    } finally {
+      setLiking(false);
+    }
+  };
 
   const handleDelete = async () => {
     if (!confirm("この投稿を削除しますか？")) return;
@@ -67,12 +122,23 @@ export default function PostCard({
             {post.content}
           </p>
           <div className="mt-2 flex items-center gap-6">
-            <span className="text-sm text-gray-400">
+            <Link
+              href={`/posts/${post.id}`}
+              className="text-sm text-gray-400 hover:text-blue-500"
+            >
               💬 {post.commentsCount}
-            </span>
-            <span className="text-sm text-gray-400">
-              ♡ {post.likesCount}
-            </span>
+            </Link>
+            <button
+              onClick={handleLike}
+              disabled={liking}
+              className={`text-sm transition-colors ${
+                liked
+                  ? "text-red-500"
+                  : "text-gray-400 hover:text-red-500"
+              }`}
+            >
+              {liked ? "❤️" : "♡"} {likesCount}
+            </button>
             {isMine && (
               <button
                 onClick={handleDelete}

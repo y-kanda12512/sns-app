@@ -8,6 +8,7 @@ import {
   getDocs,
   query,
   orderBy,
+  where,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import PostForm from "@/components/PostForm";
@@ -18,16 +19,29 @@ export default function Home() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const [posts, setPosts] = useState<Post[]>([]);
+  const [likedPostIds, setLikedPostIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
 
   const fetchPosts = useCallback(async () => {
+    if (!user) return;
     try {
-      const postsQuery = query(
-        collection(db, "posts"),
-        orderBy("createdAt", "desc")
-      );
-      const snapshot = await getDocs(postsQuery);
-      const postList: Post[] = snapshot.docs.map((doc) => {
+      const [postsSnapshot, likesSnapshot] = await Promise.all([
+        getDocs(query(collection(db, "posts"), orderBy("createdAt", "desc"))),
+        getDocs(
+          query(
+            collection(db, "postLikes"),
+            where("userId", "==", user.uid)
+          )
+        ),
+      ]);
+
+      const likedIds = new Set<string>();
+      likesSnapshot.forEach((doc) => {
+        likedIds.add(doc.data().postId);
+      });
+      setLikedPostIds(likedIds);
+
+      const postList: Post[] = postsSnapshot.docs.map((doc) => {
         const data = doc.data();
         return {
           id: doc.id,
@@ -46,7 +60,7 @@ export default function Home() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -78,7 +92,12 @@ export default function Home() {
       ) : (
         <div>
           {posts.map((post) => (
-            <PostCard key={post.id} post={post} onDeleted={fetchPosts} />
+            <PostCard
+              key={post.id}
+              post={post}
+              onDeleted={fetchPosts}
+              initialLiked={likedPostIds.has(post.id)}
+            />
           ))}
         </div>
       )}
