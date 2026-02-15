@@ -1,6 +1,5 @@
 "use client";
 
-import { use } from "react";
 import ProfileCard from "@/features/profile/components/ProfileCard";
 
 export default function UserProfilePage({
