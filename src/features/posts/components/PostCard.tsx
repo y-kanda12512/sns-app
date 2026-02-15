@@ -15,21 +15,9 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
+import UserAvatar from "@/features/common/components/UserAvatar";
+import { timeAgo } from "@/features/posts/lib/timeAgo";
 import type { Post } from "@/types/post";
-
-function timeAgo(date: Date | null): string {
-  if (!date) return "";
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffMin = Math.floor(diffMs / 60000);
-  if (diffMin < 1) return "たった今";
-  if (diffMin < 60) return `${diffMin}分前`;
-  const diffHour = Math.floor(diffMin / 60);
-  if (diffHour < 24) return `${diffHour}時間前`;
-  const diffDay = Math.floor(diffHour / 24);
-  if (diffDay < 7) return `${diffDay}日前`;
-  return date.toLocaleDateString("ja-JP");
-}
 
 export default function PostCard({
   post,
@@ -59,7 +47,6 @@ export default function PostCard({
       const snapshot = await getDocs(likesQuery);
 
       if (snapshot.empty) {
-        // いいねする
         await addDoc(collection(db, "postLikes"), {
           postId: post.id,
           userId: user.uid,
@@ -70,7 +57,6 @@ export default function PostCard({
         setLiked(true);
         setLikesCount((prev) => prev + 1);
       } else {
-        // いいね解除
         await deleteDoc(snapshot.docs[0].ref);
         await updateDoc(doc(db, "posts", post.id), {
           likesCount: increment(-1),
@@ -98,11 +84,7 @@ export default function PostCard({
   return (
     <div className="border-b border-gray-200 py-4">
       <div className="flex gap-3">
-        <Link href={`/profile/${post.authorId}`}>
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-200 text-lg text-gray-400">
-            👤
-          </div>
-        </Link>
+        <UserAvatar userId={post.authorId} size="md" />
         <div className="flex-1">
           <div className="flex items-center gap-2">
             <Link

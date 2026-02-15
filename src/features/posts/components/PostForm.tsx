@@ -4,6 +4,7 @@ import { useState } from "react";
 import { collection, addDoc, serverTimestamp, doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
+import ErrorAlert from "@/features/common/components/ErrorAlert";
 
 const MAX_LENGTH = 280;
 
@@ -51,8 +52,8 @@ export default function PostForm({ onPosted }: { onPosted?: () => void }) {
   return (
     <form onSubmit={handleSubmit} className="border-b border-gray-200 pb-4">
       {error && (
-        <div className="mb-3 rounded-lg bg-red-50 p-3 text-sm text-red-600">
-          {error}
+        <div className="mb-3">
+          <ErrorAlert message={error} />
         </div>
       )}
       <textarea
