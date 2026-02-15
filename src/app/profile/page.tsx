@@ -3,7 +3,7 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import Link from "next/link";
 import type { UserProfile } from "@/types/user";
@@ -12,6 +12,8 @@ export default function MyProfilePage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [followersCount, setFollowersCount] = useState(0);
+  const [followingCount, setFollowingCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -21,11 +23,20 @@ export default function MyProfilePage() {
     }
     if (!user) return;
 
-    const fetchProfile = async () => {
+    const fetchData = async () => {
       try {
-        const docSnap = await getDoc(doc(db, "users", user.uid));
-        if (docSnap.exists()) {
-          const data = docSnap.data();
+        const [profileSnap, followersSnap, followingSnap] = await Promise.all([
+          getDoc(doc(db, "users", user.uid)),
+          getDocs(
+            query(collection(db, "follows"), where("followingId", "==", user.uid))
+          ),
+          getDocs(
+            query(collection(db, "follows"), where("followerId", "==", user.uid))
+          ),
+        ]);
+
+        if (profileSnap.exists()) {
+          const data = profileSnap.data();
           setProfile({
             uid: user.uid,
             displayName: data.displayName,
@@ -35,13 +46,16 @@ export default function MyProfilePage() {
             updatedAt: data.updatedAt?.toDate(),
           });
         }
+
+        setFollowersCount(followersSnap.size);
+        setFollowingCount(followingSnap.size);
       } catch (err) {
         console.error("プロフィール取得エラー:", err);
       } finally {
         setLoading(false);
       }
     };
-    fetchProfile();
+    fetchData();
   }, [user, authLoading, router]);
 
   if (authLoading || loading) {
@@ -83,6 +97,23 @@ export default function MyProfilePage() {
       {profile.bio && (
         <p className="whitespace-pre-wrap text-gray-700">{profile.bio}</p>
       )}
+
+      <div className="flex gap-4 text-sm">
+        <Link
+          href={`/profile/${user.uid}/following`}
+          className="hover:underline"
+        >
+          <span className="font-bold">{followingCount}</span>
+          <span className="ml-1 text-gray-500">フォロー中</span>
+        </Link>
+        <Link
+          href={`/profile/${user.uid}/followers`}
+          className="hover:underline"
+        >
+          <span className="font-bold">{followersCount}</span>
+          <span className="ml-1 text-gray-500">フォロワー</span>
+        </Link>
+      </div>
 
       <Link
         href="/profile/edit"
